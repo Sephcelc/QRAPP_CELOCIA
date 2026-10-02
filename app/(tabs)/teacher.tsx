@@ -1,6 +1,7 @@
 import { createElement, useCallback, useState, type ChangeEvent } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
+  Alert,
   Platform,
   Pressable,
   Modal,
@@ -19,7 +20,7 @@ import AppButton from '@/components/AppButton';
 import PickerField from '@/components/PickerField';
 import { COLORS } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
-import { createEvent } from '@/lib/events';
+import { createEvent, deleteEvent, getEventsByTeacher, updateEvent, type CloudEvent } from '@/lib/events';
 import { getProfile, type ProfileRole } from '@/lib/profiles';
 import { buildQRPayload } from '@/lib/qr';
 
@@ -71,12 +72,26 @@ export default function TeacherScreen() {
   const [pickerDraft, setPickerDraft] = useState(() => new Date());
   const [payload, setPayload] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [teacherEvents, setTeacherEvents] = useState<CloudEvent[]>([]);
+
+  const refreshTeacherEvents = useCallback(async () => {
+    if (!user) return;
+    const events = await getEventsByTeacher(user.id);
+    setTeacherEvents(events);
+  }, [user]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    if (user) getProfile(user.id).then((profile) => active && setRole(profile?.role ?? 'student'));
+    if (user) {
+      getProfile(user.id).then((profile) => {
+        if (!active) return;
+        setRole(profile?.role ?? 'student');
+      });
+      refreshTeacherEvents();
+    }
     return () => { active = false; };
-  }, [user]));
+  }, [refreshTeacherEvents, user]));
 
   const openPicker = (target: 'start' | 'end', part: 'date' | 'time') => {
     setPickerDraft(new Date(target === 'start' ? startDate : endDate));
@@ -143,16 +158,60 @@ export default function TeacherScreen() {
       return;
     }
 
-    const { error } = await createEvent(event);
+    const { error } = editingEventId
+      ? await updateEvent(editingEventId, event)
+      : await createEvent(event);
+
     if (error) {
       setMessage(error.message);
       setPayload(null);
       return;
     }
-    setMessage('Event saved! Students can now scan this QR code.');
+
+    setMessage(
+      editingEventId
+        ? 'Event updated! The QR data and attendance records remain linked.'
+        : 'Event saved! Students can now scan this QR code.'
+    );
+    await refreshTeacherEvents();
     setPayload(buildQRPayload(event));
     setTitle('');
     setEventId('');
+    setEditingEventId(null);
+  };
+
+  const handleDeleteEvent = async (eventKey: string) => {
+    Alert.alert('Delete event', 'This will remove the event and all recorded attendance for it. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await deleteEvent(eventKey);
+          if (error) {
+            setMessage(error.message);
+            return;
+          }
+
+          setMessage('Event deleted.');
+          await refreshTeacherEvents();
+          if (editingEventId === eventKey) {
+            setEditingEventId(null);
+            setTitle('');
+            setEventId('');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEditEvent = (event: CloudEvent) => {
+    setEditingEventId(event.id);
+    setEventId(event.event_code);
+    setTitle(event.title);
+    setStartDate(event.start_time ? new Date(event.start_time) : new Date());
+    setEndDate(event.end_time ? new Date(event.end_time) : new Date(Date.now() + 60 * 60 * 1000));
+    setMessage('Editing event. Save the changes below.');
   };
 
   const setEndOffset = (minutes: number) => {
@@ -306,10 +365,62 @@ export default function TeacherScreen() {
 
       <AppButton
         theme="primary"
-        title="Create Event"
-        icon="add-circle"
+        title={editingEventId ? 'Save Changes' : 'Create Event'}
+        icon={editingEventId ? 'edit' : 'add-circle'}
         onPress={handleCreateEvent}
       />
+
+      {editingEventId && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setEditingEventId(null);
+            setTitle('');
+            setEventId('');
+            setMessage('Edit cancelled.');
+          }}
+          style={styles.cancelEditButton}
+        >
+          <Text style={styles.cancelEditText}>Cancel edit</Text>
+        </Pressable>
+      )}
+
+      <View style={styles.attendanceSection}>
+        <Text style={styles.sectionTitle}>Event Attendance</Text>
+        {teacherEvents.length === 0 ? (
+          <Text style={styles.emptyState}>No events yet. Create one to get started.</Text>
+        ) : (
+          teacherEvents.map((event) => (
+            <View key={event.id} style={styles.eventRow}>
+              <View style={styles.eventMeta}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                <Text style={styles.eventCode}>{event.event_code}</Text>
+                <Text style={styles.eventTime}>
+                  {event.start_time && event.end_time
+                    ? `${new Date(event.start_time).toLocaleString()} — ${new Date(event.end_time).toLocaleString()}`
+                    : 'No schedule set'}
+                </Text>
+              </View>
+              <View style={styles.eventActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleEditEvent(event)}
+                  style={({ pressed }) => [styles.actionButton, styles.editButton, pressed && styles.actionButtonPressed]}
+                >
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void handleDeleteEvent(event.id)}
+                  style={({ pressed }) => [styles.actionButton, styles.deleteButton, pressed && styles.actionButtonPressed]}
+                >
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
 
       {payload && (
         <View style={styles.resultCard}>
@@ -434,6 +545,102 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     textAlign: 'center',
     marginTop: 12,
+  },
+  attendanceSection: {
+    marginTop: 28,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+  },
+  emptyState: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  eventRow: {
+    backgroundColor: COLORS.elevated,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  eventMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  eventTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  eventCode: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  eventTime: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+  },
+  eventActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButton: {
+    minWidth: 68,
+    minHeight: 36,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonPressed: {
+    opacity: 0.8,
+  },
+  editButton: {
+    backgroundColor: COLORS.primarySoft,
+  },
+  editButtonText: {
+    color: COLORS.primaryDark,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  deleteButton: {
+    backgroundColor: '#fee2e2',
+  },
+  deleteButtonText: {
+    color: '#b91c1c',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  cancelEditButton: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  cancelEditText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
   },
   resultCard: {
     backgroundColor: COLORS.card,

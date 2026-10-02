@@ -35,6 +35,39 @@ export async function createEvent(event: Event) {
   );
 }
 
+export async function updateEvent(eventId: string, event: Event) {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    return { data: null, error: authError ?? new Error('You must be signed in.') };
+  }
+
+  return supabase
+    .from('events')
+    .update({
+      event_code: event.eventId,
+      title: event.title,
+      start_time: event.start,
+      end_time: event.end,
+    })
+    .eq('id', eventId)
+    .eq('created_by', authData.user.id)
+    .select('*')
+    .single();
+}
+
+export async function deleteEvent(eventId: string) {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    return { error: authError ?? new Error('You must be signed in.') };
+  }
+
+  return supabase
+    .from('events')
+    .delete()
+    .eq('id', eventId)
+    .eq('created_by', authData.user.id);
+}
+
 export async function getEventsByTeacher(teacherId: string): Promise<CloudEvent[]> {
   const { data, error } = await supabase
     .from('events')

@@ -33,31 +33,29 @@ export default function Index() {
               </View>
               <View>
                 <Text style={styles.brandName}>QR Attendance</Text>
-                <Text style={styles.brandMeta}>DAMASOLE SCHOOL SYSTEM</Text>
+                <Text style={styles.brandMeta}>CELOCIA QR SCHOOL SYSTEM</Text>
               </View>
             </View>
 
             <Text style={styles.eyebrow}>SMART EVENT CHECK-IN</Text>
             <Text style={[styles.heroTitle, desktop && styles.desktopHeroTitle]}>
-              Attendance that keeps everyone moving.
+              Presence that drives progress for all.
             </Text>
             <Text style={styles.heroText}>
-              Scan event QR codes, review your attendance, and keep your school
-              activity records in one secure place.
+              Check in with event QR codes, view your attendance history, and keep your school activity records safely in one place.
             </Text>
 
             <View style={styles.statusRow}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Cloud attendance is ready</Text>
+            
             </View>
-            <Text style={styles.credit}>Developed by Auriel Fritz L. Damasole</Text>
+            <Text style={styles.credit}>Developed by Joseph V. Celocia</Text>
           </View>
 
           <View style={[styles.actionCard, desktop && styles.desktopActionCard]}>
-            <Text style={styles.actionEyebrow}>QUICK ACTIONS</Text>
-            <Text style={styles.actionTitle}>What would you like to do?</Text>
+            
+            <Text style={styles.actionTitle}>How would you like to proceed?</Text>
             <Text style={styles.actionText}>
-              Choose an option below to continue.
+              Select an option below to proceed.
             </Text>
 
             <AppButton
