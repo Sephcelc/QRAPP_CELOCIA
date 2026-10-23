@@ -21,6 +21,9 @@ expo-dev.*.log
 .DS_Store
 
 # local environment overrides
+.env
+.env.*
+!.env.example
 .env*.local
 
 # teaching materials

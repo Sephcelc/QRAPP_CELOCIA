@@ -25,7 +25,7 @@ export default function TabLayout() {
           marginHorizontal: 4,
           marginVertical: 4,
           paddingVertical: 4,
-          borderRadius: 24,
+          borderRadius: 12,
         },
         tabBarHideOnKeyboard: true,
         tabBarStyle: desktop
@@ -35,8 +35,8 @@ export default function TabLayout() {
               left: (width - navWidth) / 2,
               bottom: 22,
               height: 72,
-              borderRadius: 36,
-              backgroundColor: COLORS.elevated,
+              borderRadius: 24,
+              backgroundColor: COLORS.card,
               borderWidth: 1,
               borderTopWidth: 1,
               borderColor: COLORS.border,
@@ -48,8 +48,9 @@ export default function TabLayout() {
             }
           : {
               height: width < 360 ? 64 : 68,
-              backgroundColor: COLORS.elevated,
+              backgroundColor: COLORS.card,
               borderTopColor: COLORS.border,
+              borderTopWidth: 1,
               paddingBottom: 6,
             },
       }}
@@ -80,6 +81,13 @@ export default function TabLayout() {
         options={{
           title: 'Teacher',
           tabBarIcon: ({ color }) => <MaterialIcons name="event-note" color={color} size={25} />,
+        }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Admin',
+          tabBarIcon: ({ color }) => <MaterialIcons name="admin-panel-settings" color={color} size={25} />,
         }}
       />
       <Tabs.Screen

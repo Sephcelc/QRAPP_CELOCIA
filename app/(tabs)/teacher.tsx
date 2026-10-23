@@ -7,7 +7,6 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
@@ -17,6 +16,7 @@ import DateTimePicker, {
 import QRCode from 'react-native-qrcode-svg';
 
 import AppButton from '@/components/AppButton';
+import Text from '@/components/AppText';
 import PickerField from '@/components/PickerField';
 import { COLORS } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
@@ -223,7 +223,7 @@ export default function TeacherScreen() {
   }
 
   if (role !== 'teacher') {
-    return <View style={styles.gate}><Text style={styles.title}>Teachers Only</Text><Text style={styles.subtitle}>Event creation is available to teacher accounts.</Text></View>;
+    return <View style={styles.gate}><Text style={styles.gateTitle}>Teachers Only</Text><Text style={styles.subtitle}>Event creation is available to teacher accounts.</Text></View>;
   }
 
   return (
@@ -476,6 +476,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: 4,
+  },
+  gateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,

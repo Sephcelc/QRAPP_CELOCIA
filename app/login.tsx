@@ -5,7 +5,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
   View,
@@ -13,6 +12,7 @@ import {
 import { Link } from 'expo-router';
 
 import AppButton from '@/components/AppButton';
+import Text from '@/components/AppText';
 import Header from '@/components/Header';
 import { COLORS } from '@/constants/colors';
 import { signIn } from '@/lib/auth';

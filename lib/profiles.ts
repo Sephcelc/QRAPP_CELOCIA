@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js';
 
 import { supabase, supabaseProjectRef } from './supabase';
 
-export type ProfileRole = 'student' | 'teacher';
+export type ProfileRole = 'student' | 'teacher' | 'admin';
 
 export type Profile = {
   id: string;
@@ -115,6 +115,54 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   }
 
   return (data as Profile | null) ?? null;
+}
+
+export async function getProfilesForAdmin(): Promise<{ profiles: Profile[]; error: Error | null }> {
+  const profiles: Profile[] = [];
+  const pageSize = 1000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      return { profiles: [], error: toProfileError(error, 'Unable to load user accounts.') };
+    }
+
+    profiles.push(...((data ?? []) as Profile[]));
+    if (!data || data.length < pageSize) break;
+  }
+
+  return { profiles, error: null };
+}
+
+export async function updateManagedProfileRole(
+  userId: string,
+  role: ProfileRole
+): Promise<ProfileResult> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    return { profile: null, error: toProfileError(error, 'Unable to update this account.') };
+  }
+
+  if (!data) {
+    return {
+      profile: null,
+      error: new Error('No account was updated. Confirm that you still have administrator access.'),
+    };
+  }
+
+  return { profile: data as Profile, error: null };
 }
 
 /**

@@ -10,10 +10,14 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text not null,
   full_name text,
-  role text not null default 'student' check (role in ('student', 'teacher')),
+  role text not null default 'student' check (role in ('student', 'teacher', 'admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles
+  add constraint profiles_role_check check (role in ('student', 'teacher', 'admin'));
 
 create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
@@ -37,9 +41,26 @@ alter table public.profiles enable row level security;
 alter table public.events enable row level security;
 alter table public.attendance enable row level security;
 
+create or replace function public.is_current_user_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+revoke all on function public.is_current_user_admin() from public;
+grant execute on function public.is_current_user_admin() to authenticated;
+
 drop policy if exists "Profiles are viewable by owner" on public.profiles;
 create policy "Profiles are viewable by owner" on public.profiles
-  for select using (auth.uid() = id);
+  for select using (auth.uid() = id or public.is_current_user_admin());
 
 drop policy if exists "Users can insert their own profile" on public.profiles;
 create policy "Users can insert their own profile" on public.profiles
@@ -47,7 +68,28 @@ create policy "Users can insert their own profile" on public.profiles
 
 drop policy if exists "Users can update their own profile" on public.profiles;
 create policy "Users can update their own profile" on public.profiles
-  for update using (auth.uid() = id);
+  for update using (auth.uid() = id or public.is_current_user_admin())
+  with check (auth.uid() = id or public.is_current_user_admin());
+
+create or replace function public.prevent_self_service_admin_assignment()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.role = 'admin'
+    and auth.uid() is not null
+    and not public.is_current_user_admin() then
+    raise exception 'Admin role must be assigned by an administrator.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_self_service_admin_assignment on public.profiles;
+create trigger prevent_self_service_admin_assignment
+  before insert or update of role on public.profiles
+  for each row execute function public.prevent_self_service_admin_assignment();
 
 drop policy if exists "Teachers can view profiles of their attendees" on public.profiles;
 create policy "Teachers can view profiles of their attendees" on public.profiles
@@ -95,7 +137,12 @@ create policy "Users can insert events" on public.events
 
 drop policy if exists "Users can update their own events" on public.events;
 create policy "Users can update their own events" on public.events
-  for update using (auth.uid() = created_by);
+  for update using (auth.uid() = created_by or public.is_current_user_admin())
+  with check (auth.uid() = created_by or public.is_current_user_admin());
+
+drop policy if exists "Users can delete their own events" on public.events;
+create policy "Users can delete their own events" on public.events
+  for delete using (auth.uid() = created_by or public.is_current_user_admin());
 
 drop policy if exists "Students can view their own attendance" on public.attendance;
 create policy "Students can view their own attendance" on public.attendance
@@ -113,6 +160,23 @@ create policy "Teachers can view attendance for their events" on public.attendan
       where e.id = attendance.event_id and e.created_by = auth.uid()
     )
   );
+
+drop policy if exists "Admins can view all attendance" on public.attendance;
+create policy "Admins can view all attendance" on public.attendance
+  for select using (public.is_current_user_admin());
+
+drop policy if exists "Admins can insert attendance records" on public.attendance;
+create policy "Admins can insert attendance records" on public.attendance
+  for insert with check (public.is_current_user_admin());
+
+drop policy if exists "Admins can correct attendance records" on public.attendance;
+create policy "Admins can correct attendance records" on public.attendance
+  for update using (public.is_current_user_admin())
+  with check (public.is_current_user_admin());
+
+drop policy if exists "Admins can delete attendance records" on public.attendance;
+create policy "Admins can delete attendance records" on public.attendance
+  for delete using (public.is_current_user_admin());
 
 -- Ask PostgREST to reload its schema cache right away. Without this, the REST API
 -- can keep answering "Could not find the table 'public.profiles' in the schema

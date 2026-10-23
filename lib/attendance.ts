@@ -1,4 +1,5 @@
 import { getEventByCode } from './events';
+import { getProfilesForAdmin } from './profiles';
 import { parseQRPayload } from './qr';
 import { supabase } from './supabase';
 
@@ -33,6 +34,17 @@ export type TeacherEventSummary = {
   eventCode: string;
   title: string;
   attendeeCount: number;
+};
+
+export type AdminAttendanceRecord = {
+  id: string;
+  studentId: string;
+  studentName: string | null;
+  studentEmail: string;
+  eventId: string;
+  eventCode: string;
+  eventTitle: string;
+  scannedAt: string;
 };
 
 export async function registerAttendance(rawPayload: string): Promise<RegisterResult> {
@@ -178,4 +190,91 @@ export async function getTeacherEventSummary(
     title: event.title,
     attendeeCount: counts[event.id] ?? 0,
   }));
+}
+
+export async function getAllAttendanceForAdmin(): Promise<{
+  records: AdminAttendanceRecord[];
+  error: Error | null;
+}> {
+  const rows: Array<{
+    id: string;
+    student_id: string;
+    event_id: string;
+    scanned_at: string;
+    events: { event_code: string; title: string } | Array<{ event_code: string; title: string }> | null;
+  }> = [];
+  const pageSize = 1000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('id, student_id, event_id, scanned_at, events ( event_code, title )')
+      .order('scanned_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) return { records: [], error: new Error(error.message) };
+    rows.push(...((data ?? []) as typeof rows));
+    if (!data || data.length < pageSize) break;
+  }
+
+  const { profiles, error: profilesError } = await getProfilesForAdmin();
+  if (profilesError) return { records: [], error: profilesError };
+
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const records = rows.map((row) => {
+    const event = Array.isArray(row.events) ? row.events[0] : row.events;
+    const profile = profileById.get(row.student_id);
+    return {
+      id: row.id,
+      studentId: row.student_id,
+      studentName: profile?.full_name ?? null,
+      studentEmail: profile?.email ?? '',
+      eventId: row.event_id,
+      eventCode: event?.event_code ?? '',
+      eventTitle: event?.title ?? 'Unknown event',
+      scannedAt: row.scanned_at,
+    };
+  });
+
+  return { records, error: null };
+}
+
+export async function saveAdminAttendanceRecord(
+  record: Pick<AdminAttendanceRecord, 'studentId' | 'eventId' | 'scannedAt'>,
+  recordId?: string
+) {
+  const values = {
+    student_id: record.studentId,
+    event_id: record.eventId,
+    scanned_at: record.scannedAt,
+  };
+
+  if (!recordId) {
+    return supabase.from('attendance').insert(values).select('id').single();
+  }
+
+  const { data, error } = await supabase
+    .from('attendance')
+    .update(values)
+    .eq('id', recordId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) return { data: null, error };
+  if (!data) return { data: null, error: new Error('Attendance record not found or update not authorized.') };
+  return { data, error: null };
+}
+
+export async function deleteAdminAttendanceRecord(recordId: string) {
+  const { data, error } = await supabase
+    .from('attendance')
+    .delete()
+    .eq('id', recordId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) return { error };
+  if (!data) return { error: new Error('Attendance record not found or delete not authorized.') };
+  return { error: null };
 }

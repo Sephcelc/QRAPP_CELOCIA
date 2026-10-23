@@ -6,12 +6,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 
+import Text from '@/components/AppText';
 import { COLORS } from '@/constants/colors';
 import { setAuth, signOut, useAuth } from '@/lib/auth';
 import {
@@ -136,7 +136,13 @@ export default function ProfileScreen() {
   const displayName = profile?.full_name || 'No name set';
   const email = session?.user.email ?? 'No email available';
   const initial = (profile?.full_name || email).trim().charAt(0).toUpperCase() || '?';
-  const roleLabel = profile?.role === 'teacher' ? 'Teacher' : profile?.role === 'student' ? 'Student' : 'Unavailable';
+  const roleLabel = profile?.role === 'admin'
+    ? 'Admin'
+    : profile?.role === 'teacher'
+      ? 'Teacher'
+      : profile?.role === 'student'
+        ? 'Student'
+        : 'Unavailable';
 
   return (
     <ScrollView
@@ -199,33 +205,40 @@ export default function ProfileScreen() {
                 />
                 <Text style={styles.roleFieldLabel}>Account type</Text>
                 <View accessibilityRole="radiogroup" style={styles.roleOptions}>
-                  {(['student', 'teacher'] as const).map((option) => {
+                  {(['student', 'teacher', 'admin'] as const).map((option) => {
                     const active = selectedRole === option;
+                    const label = option === 'admin' ? 'Admin' : option === 'teacher' ? 'Teacher' : 'Student';
+                    const disabled = option === 'admin' && profile?.role !== 'admin';
                     return (
                       <Pressable
-                        accessibilityLabel={`${option === 'student' ? 'Student' : 'Teacher'} account`}
+                        accessibilityLabel={`${label} account${disabled ? ', assigned by an administrator' : ''}`}
                         accessibilityRole="radio"
-                        accessibilityState={{ checked: active }}
+                        accessibilityState={{ checked: active, disabled }}
+                        disabled={disabled}
                         key={option}
                         onPress={() => setSelectedRole(option)}
                         style={({ pressed }) => [
                           styles.roleOption,
                           active && styles.roleOptionActive,
+                          disabled && styles.roleOptionDisabled,
                           pressed && styles.profileActionPressed,
                         ]}
                       >
                         <MaterialIcons
                           color={active ? COLORS.primary : COLORS.textSecondary}
-                          name={option === 'student' ? 'school' : 'badge'}
+                          name={option === 'admin' ? 'admin-panel-settings' : option === 'student' ? 'school' : 'badge'}
                           size={20}
                         />
                         <Text style={[styles.roleOptionText, active && styles.roleOptionTextActive]}>
-                          {option === 'student' ? 'Student' : 'Teacher'}
+                          {label}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
+                {profile?.role !== 'admin' && (
+                  <Text style={styles.roleNotice}>Admin accounts are assigned by an administrator.</Text>
+                )}
               </View>
             ) : (
               <View style={styles.detailRow}>
@@ -331,9 +344,11 @@ const styles = StyleSheet.create({
   input: { width: '100%', minHeight: 52, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, backgroundColor: COLORS.card, color: COLORS.textPrimary, paddingHorizontal: 16, fontSize: 16 },
   roleOptions: { width: '100%', flexDirection: 'row', gap: 10 },
   roleOption: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, backgroundColor: COLORS.card },
+  roleOptionDisabled: { opacity: 0.5 },
   roleOptionActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft },
   roleOptionText: { color: COLORS.textSecondary, fontSize: 14, fontWeight: '700' },
   roleOptionTextActive: { color: COLORS.primary },
+  roleNotice: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 8 },
   message: { color: COLORS.danger, fontSize: 13, lineHeight: 19, marginTop: 2, marginBottom: 10 },
   successMessage: { color: COLORS.success },
   setupNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: COLORS.primarySoft, borderWidth: 1, borderColor: COLORS.primaryDark, borderRadius: 16, padding: 16, marginBottom: 20 },

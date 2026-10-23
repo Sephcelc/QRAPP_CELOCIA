@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
   View,
@@ -14,9 +13,9 @@ import {
 import { Link } from 'expo-router';
 
 import AppButton from '@/components/AppButton';
+import Text from '@/components/AppText';
 import { COLORS } from '@/constants/colors';
-import { signUp } from '@/lib/auth';
-import type { ProfileRole } from '@/lib/profiles';
+import { signUp, type SignUpProfile } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function RegisterScreen() {
@@ -26,7 +25,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<ProfileRole>('student');
+  const [role, setRole] = useState<SignUpProfile['role']>('student');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 

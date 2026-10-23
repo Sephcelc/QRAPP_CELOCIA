@@ -1,8 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import Text from '@/components/AppText';
 import AppButton from '@/components/AppButton';
 import { COLORS } from '@/constants/colors';
 import { registerAttendance } from '@/lib/attendance';

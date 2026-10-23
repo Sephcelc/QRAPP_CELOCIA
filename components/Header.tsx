@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import Text from '@/components/AppText';
 import { COLORS } from '@/constants/colors';
 
 type Props = { title: string };
